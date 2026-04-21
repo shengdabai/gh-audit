@@ -18,7 +18,8 @@ class GovernanceScanner(BaseScanner):
         try:
             repo = gh.get_repo(config.repo)
         except GithubException as e:
-            return [self._make(config, "github-api-error", f"Cannot access repo: {e}",
+            safe_msg = f"HTTP {e.status}" + (f": {e.data.get('message', '')}" if isinstance(e.data, dict) else "")
+            return [self._make(config, "github-api-error", f"Cannot access repo: {safe_msg}",
                                Severity.INFO, "Check token permissions")]
 
         findings: list[Finding] = []

@@ -55,6 +55,10 @@ class Finding:
     discovered_at: datetime
     status: Status
 
+    def __post_init__(self) -> None:
+        if not self.fingerprint:
+            self.fingerprint = self.compute_fingerprint()
+
     def compute_fingerprint(self) -> str:
         """Location-aware fingerprint for within-scan deduplication."""
         raw = f"{self.category}:{self.file_path}:{self.line_start}:{self.rule_id}:{self.evidence_redacted}"

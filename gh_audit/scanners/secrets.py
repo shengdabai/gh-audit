@@ -59,7 +59,7 @@ class SecretsScanner(BaseScanner):
         findings: list[Finding] = []
         lines = text.splitlines()
         for lineno, line in enumerate(lines, start=1):
-            matched_positions: set[int] = set()
+            matched_spans: list[tuple[int, int]] = []
             for rule_id, pattern, severity, rec, confidence in _PATTERNS:
                 if match := re.search(pattern, line):
                     # For generic password/key patterns, skip low-entropy placeholders
@@ -67,12 +67,13 @@ class SecretsScanner(BaseScanner):
                         value = match.group(2) if match.lastindex and match.lastindex >= 2 else match.group(0)
                         if _shannon_entropy(value) < 3.0:
                             continue
-                    matched_positions.add(match.start())
+                    matched_spans.append((match.start(), match.end()))
                     raw = match.group(0)
                     findings.append(self._make_finding(rule_id, severity, rec, file_path, lineno, raw, config, confidence=confidence))
-            # Entropy check — skip positions already matched by named patterns
+            # Entropy check — skip tokens overlapping with already-matched spans
             for token_match in re.finditer(r"[A-Za-z0-9+/=_\-]{20,}", line):
-                if token_match.start() in matched_positions:
+                ts, te = token_match.start(), token_match.end()
+                if any(ts < me and te > ms for ms, me in matched_spans):
                     continue
                 token = token_match.group(0)
                 if _shannon_entropy(token) > 4.5:
