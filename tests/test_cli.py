@@ -68,12 +68,12 @@ def test_suppress_stores_fingerprint(tmp_path, monkeypatch):
     result = runner.invoke(cli, ["suppress", fake_fp, "--reason", "test data"])
     assert result.exit_code == 0
     suppress_file = suppress_dir / "suppressions.json"
-    if suppress_file.exists():
-        import json
-        data = json.loads(suppress_file.read_text())
-        assert fake_fp in data
-        assert data[fake_fp]["reason"] == "test data"
-        assert "created_at" in data[fake_fp]
+    assert suppress_file.exists(), "suppressions.json should be created"
+    import json
+    data = json.loads(suppress_file.read_text())
+    assert fake_fp in data
+    assert data[fake_fp]["reason"] == "test data"
+    assert "created_at" in data[fake_fp]
 
 
 def test_config_set_token_warns(tmp_path):

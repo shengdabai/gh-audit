@@ -153,7 +153,7 @@ def _write_reports(findings, repo_name, output_formats, cfg):
 @cli.command()
 def doctor():
     """Check tool availability and token status."""
-    from github import Github
+    from github import Github  # noqa: PLC0415 — lazy import to avoid slow startup
     cfg = Config.load()
     console.print("\n[bold]gh-audit doctor[/bold]\n")
     if cfg.token:

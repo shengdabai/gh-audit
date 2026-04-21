@@ -79,12 +79,13 @@ def load_suppressions() -> set[str]:
             created_str = meta.get("created_at", "")
             if expires_str and created_str:
                 try:
-                    days = int(expires_str.rstrip("d"))
+                    # Accept "30d" or "30" (plain integer days)
+                    days = int(re.sub(r"[^0-9]", "", expires_str))
                     created = datetime.fromisoformat(created_str)
                     if now > created + timedelta(days=days):
                         continue  # expired, skip
                 except (ValueError, TypeError):
-                    pass  # malformed, treat as non-expiring
+                    pass  # malformed expires, treat as non-expiring
             active.add(fp)
         return active
     except Exception:

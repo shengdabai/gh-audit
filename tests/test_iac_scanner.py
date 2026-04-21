@@ -99,3 +99,15 @@ def test_checkov_timeout_returns_empty(tmp_path):
         with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("checkov", 120)):
             findings = IacScanner().scan(str(tmp_path), _cfg())
     assert findings == []
+
+
+def test_checkov_invalid_json_returns_empty(tmp_path):
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "not valid json {"
+    mock_result.stderr = ""
+
+    with patch("shutil.which", side_effect=lambda t: "/usr/bin/checkov" if t == "checkov" else None):
+        with patch("subprocess.run", return_value=mock_result):
+            findings = IacScanner().scan(str(tmp_path), _cfg())
+    assert findings == []
