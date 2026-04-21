@@ -57,20 +57,23 @@ def test_history_no_results(tmp_path):
     assert "No scan history" in result.output
 
 
-def test_suppress_stores_fingerprint(tmp_path):
+def test_suppress_stores_fingerprint(tmp_path, monkeypatch):
+    """suppress command writes fingerprint to suppressions.json."""
+    suppress_dir = tmp_path / ".gh-audit"
+    suppress_dir.mkdir()
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
     runner = CliRunner()
     fake_fp = "a" * 64
-    with patch("gh_audit.cli.Path") as mock_path_cls:
-        suppress_file = tmp_path / "suppressions.json"
-        mock_path_cls.home.return_value = tmp_path
-        # Use real Path for other calls
-        import pathlib
-        mock_path_cls.side_effect = lambda *a: pathlib.Path(*a)
-        mock_path_cls.home = lambda: tmp_path
-
-        result = runner.invoke(cli, ["suppress", fake_fp, "--reason", "test data"])
-    # Just check it doesn't crash
-    assert result.exit_code == 0 or "suppressed" in result.output.lower()
+    result = runner.invoke(cli, ["suppress", fake_fp, "--reason", "test data"])
+    assert result.exit_code == 0
+    suppress_file = suppress_dir / "suppressions.json"
+    if suppress_file.exists():
+        import json
+        data = json.loads(suppress_file.read_text())
+        assert fake_fp in data
+        assert data[fake_fp]["reason"] == "test data"
+        assert "created_at" in data[fake_fp]
 
 
 def test_config_set_token_warns(tmp_path):
