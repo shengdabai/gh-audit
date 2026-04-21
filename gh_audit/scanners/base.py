@@ -3,6 +3,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from gh_audit.models import Finding
 
+SKIP_DIRS: frozenset[str] = frozenset({
+    ".git", "node_modules", "vendor", ".venv", "venv",
+    "__pycache__", "dist", "build",
+})
+
 
 @dataclass
 class ScanConfig:

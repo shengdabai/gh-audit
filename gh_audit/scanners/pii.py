@@ -5,7 +5,7 @@ from pathlib import Path
 
 from gh_audit.models import Category, Confidence, Finding, Severity, Status
 from gh_audit.normalizer import redact_email, redact_id_number, redact_phone, redact_secret
-from gh_audit.scanners.base import BaseScanner, ScanConfig
+from gh_audit.scanners.base import BaseScanner, ScanConfig, SKIP_DIRS
 
 _TEXT_EXTENSIONS = {
     ".txt", ".csv", ".json", ".log", ".sql", ".md",
@@ -14,9 +14,6 @@ _TEXT_EXTENSIONS = {
 }
 
 _TEXT_NAME_PREFIXES = (".env",)  # catches .env.production, .env.local, etc.
-
-_SKIP_DIRS = {".git", "node_modules", "vendor", ".venv", "venv", "__pycache__", "dist", "build"}
-
 
 def _luhn_check(number: str) -> bool:
     digits = [int(d) for d in number if d.isdigit()]
@@ -55,7 +52,7 @@ class PiiScanner(BaseScanner):
         for path in Path(repo_path).rglob("*"):
             if not path.is_file():
                 continue
-            if any(part in _SKIP_DIRS for part in path.parts):
+            if any(part in SKIP_DIRS for part in path.parts):
                 continue
             if not _is_text_file(path):
                 continue

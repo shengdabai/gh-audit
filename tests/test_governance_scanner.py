@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+from github import GithubException
 from gh_audit.scanners.governance import GovernanceScanner
 from gh_audit.scanners.base import ScanConfig
 
@@ -11,7 +12,7 @@ def test_no_branch_protection_is_high_finding():
     mock_branch.protected = False
     mock_repo.get_branch.return_value = mock_branch
     mock_repo.default_branch = "main"
-    mock_repo.get_contents.side_effect = Exception("404")
+    mock_repo.get_contents.side_effect = GithubException(404)
 
     with patch("gh_audit.scanners.governance.Github") as MockGH:
         MockGH.return_value.get_repo.return_value = mock_repo
@@ -27,7 +28,7 @@ def test_missing_security_md_is_finding():
     mock_branch.protected = True
     mock_repo.get_branch.return_value = mock_branch
     mock_repo.default_branch = "main"
-    mock_repo.get_contents.side_effect = Exception("404")
+    mock_repo.get_contents.side_effect = GithubException(404)
 
     with patch("gh_audit.scanners.governance.Github") as MockGH:
         MockGH.return_value.get_repo.return_value = mock_repo

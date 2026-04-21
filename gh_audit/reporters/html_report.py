@@ -1,6 +1,6 @@
 from html import escape
 from datetime import datetime, timezone
-from gh_audit.models import Finding, Severity
+from gh_audit.models import Finding
 
 _SEVERITY_COLOR = {
     "critical": "#dc2626",
@@ -28,7 +28,7 @@ class HtmlReporter:
             )
 
         summary_counts = {s: sum(1 for f in findings if f.severity.value == s)
-                          for s in ("critical", "high", "medium", "low")}
+                          for s in ("critical", "high", "medium", "low", "info")}
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
         html = f"""<!DOCTYPE html>
@@ -55,6 +55,7 @@ class HtmlReporter:
     <span class="badge" style="background:#ea580c">{summary_counts['high']} High</span>
     <span class="badge" style="background:#d97706">{summary_counts['medium']} Medium</span>
     <span class="badge" style="background:#65a30d">{summary_counts['low']} Low</span>
+    <span class="badge" style="background:#6b7280">{summary_counts['info']} Info</span>
   </div>
   <table>
     <thead><tr><th>Severity</th><th>Category</th><th>Title</th><th>Location</th><th>Evidence</th><th>Recommendation</th></tr></thead>

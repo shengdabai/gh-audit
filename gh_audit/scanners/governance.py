@@ -38,7 +38,7 @@ class GovernanceScanner(BaseScanner):
             try:
                 repo.get_contents(fname)
                 break
-            except Exception:
+            except GithubException:
                 continue
         else:
             findings.append(self._make(
@@ -50,7 +50,7 @@ class GovernanceScanner(BaseScanner):
             try:
                 repo.get_contents(fname)
                 break
-            except Exception:
+            except GithubException:
                 continue
         else:
             findings.append(self._make(

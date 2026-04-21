@@ -6,23 +6,20 @@ from pathlib import Path
 
 from gh_audit.models import Category, Confidence, Finding, Severity, Status
 from gh_audit.normalizer import redact_secret
-from gh_audit.scanners.base import BaseScanner, ScanConfig
+from gh_audit.scanners.base import BaseScanner, ScanConfig, SKIP_DIRS
 
 _PATTERNS = [
-    ("aws-access-key",     r"AKIA[0-9A-Z]{16}",                        Severity.CRITICAL, "Rotate in AWS IAM console"),
-    ("github-token",       r"gh[ps]_[A-Za-z0-9]{36}",                   Severity.CRITICAL, "Revoke at github.com/settings/tokens"),
-    ("openai-api-key",     r"sk-[A-Za-z0-9]{40,}",                      Severity.CRITICAL, "Revoke at platform.openai.com"),
-    ("stripe-key",         r"sk_live_[0-9a-zA-Z]{24,}",                 Severity.CRITICAL, "Revoke in Stripe dashboard"),
-    ("generic-api-key",    r"(?i)(api[_-]?key|apikey)\s*=\s*['\"]?([A-Za-z0-9\-_]{20,})", Severity.HIGH, "Move to environment variable"),
-    ("db-password",        r"(?i)(password|passwd|pwd)\s*=\s*['\"]?([^\s'\"]{8,})",        Severity.HIGH, "Use secrets manager"),
-    ("private-key-header", r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",              Severity.CRITICAL, "Remove from repo, regenerate key"),
+    ("aws-access-key",     r"AKIA[0-9A-Z]{16}",                        Severity.CRITICAL, "Rotate in AWS IAM console",              Confidence.CONFIRMED),
+    ("github-token",       r"gh[ps]_[A-Za-z0-9]{36}",                   Severity.CRITICAL, "Revoke at github.com/settings/tokens",    Confidence.CONFIRMED),
+    ("openai-api-key",     r"sk-[A-Za-z0-9]{40,}",                      Severity.CRITICAL, "Revoke at platform.openai.com",           Confidence.CONFIRMED),
+    ("stripe-key",         r"sk_live_[0-9a-zA-Z]{24,}",                 Severity.CRITICAL, "Revoke in Stripe dashboard",              Confidence.CONFIRMED),
+    ("generic-api-key",    r"(?i)(api[_-]?key|apikey)\s*=\s*['\"]?([A-Za-z0-9\-_]{20,})", Severity.HIGH, "Move to environment variable",  Confidence.LIKELY),
+    ("db-password",        r"(?i)(password|passwd|pwd)\s*=\s*['\"]?([^\s'\"]{8,})",        Severity.HIGH, "Use secrets manager",             Confidence.LIKELY),
+    ("private-key-header", r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",              Severity.CRITICAL, "Remove from repo, regenerate key", Confidence.CONFIRMED),
 ]
 
 _BINARY_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".pdf", ".zip", ".gz", ".tar",
                        ".exe", ".bin", ".pyc", ".so", ".dylib", ".whl"}
-
-_SKIP_DIRS = {".git", "node_modules", "vendor", ".venv", "venv", "__pycache__", "dist", "build"}
-
 
 def _shannon_entropy(s: str) -> float:
     if not s:
@@ -46,7 +43,7 @@ class SecretsScanner(BaseScanner):
         for path in Path(repo_path).rglob("*"):
             if not path.is_file():
                 continue
-            if any(part in _SKIP_DIRS for part in path.parts):
+            if any(part in SKIP_DIRS for part in path.parts):
                 continue
             if path.suffix.lower() in _BINARY_EXTENSIONS:
                 continue
@@ -63,11 +60,16 @@ class SecretsScanner(BaseScanner):
         lines = text.splitlines()
         for lineno, line in enumerate(lines, start=1):
             matched_positions: set[int] = set()
-            for rule_id, pattern, severity, rec in _PATTERNS:
+            for rule_id, pattern, severity, rec, confidence in _PATTERNS:
                 if match := re.search(pattern, line):
+                    # For generic password/key patterns, skip low-entropy placeholders
+                    if rule_id in ("db-password", "generic-api-key"):
+                        value = match.group(2) if match.lastindex and match.lastindex >= 2 else match.group(0)
+                        if _shannon_entropy(value) < 3.0:
+                            continue
                     matched_positions.add(match.start())
                     raw = match.group(0)
-                    findings.append(self._make_finding(rule_id, severity, rec, file_path, lineno, raw, config))
+                    findings.append(self._make_finding(rule_id, severity, rec, file_path, lineno, raw, config, confidence=confidence))
             # Entropy check — skip positions already matched by named patterns
             for token_match in re.finditer(r"[A-Za-z0-9+/=_\-]{20,}", line):
                 if token_match.start() in matched_positions:
@@ -79,12 +81,13 @@ class SecretsScanner(BaseScanner):
                         "Review whether this is a secret; move to env var if so",
                         file_path, lineno, token, config,
                         redact_fn=_redact_entropy_token,
+                        confidence=Confidence.POSSIBLE,
                     ))
         return findings
 
     def _make_finding(self, rule_id: str, severity: Severity, rec: str,
                       file_path: str, lineno: int, raw: str, config: ScanConfig,
-                      redact_fn=None) -> Finding:
+                      redact_fn=None, confidence: Confidence = Confidence.LIKELY) -> Finding:
         redact = redact_fn or redact_secret
         redacted = redact(raw)
         f = Finding(
@@ -100,7 +103,7 @@ class SecretsScanner(BaseScanner):
             rule_id=rule_id,
             title=f"Potential secret: {rule_id}",
             severity=severity,
-            confidence=Confidence.LIKELY,
+            confidence=confidence,
             evidence_redacted=redacted,
             recommendation=rec,
             standard_mapping=["CWE-798", "OWASP-A02"],
