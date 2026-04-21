@@ -91,7 +91,7 @@ class ScaScanner(BaseScanner):
                         )
                         f.fingerprint = f.compute_fingerprint()
                         findings.append(f)
-            except Exception as e:
+            except (OSError, ValueError, KeyError) as e:
                 console.print(f"[yellow][sca] error scanning {lock}: {e}[/yellow]")
                 continue
         return findings
@@ -122,7 +122,7 @@ class ScaScanner(BaseScanner):
                 timeout=15,
             )
             results = resp.json().get("results", [])
-        except Exception as e:
+        except (requests.RequestException, ValueError, KeyError) as e:
             console.print(f"[yellow][sca] OSV API error: {e}[/yellow]")
             return {}
         return {

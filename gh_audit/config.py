@@ -22,7 +22,10 @@ class Config:
         cfg = cls()
         cfg.token = os.environ.get("GITHUB_TOKEN")
         if _CONFIG_FILE.exists():
-            data = json.loads(_CONFIG_FILE.read_text())
+            try:
+                data = json.loads(_CONFIG_FILE.read_text())
+            except (json.JSONDecodeError, OSError):
+                data = {}
             if not cfg.token:
                 cfg.token = data.get("token")
             cfg.modules = data.get("modules", cfg.modules)
@@ -33,6 +36,7 @@ class Config:
 
     def save(self) -> None:
         _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        os.chmod(_CONFIG_DIR, stat.S_IRWXU)  # 0o700: owner only
         data = {
             "token": self.token,
             "modules": self.modules,

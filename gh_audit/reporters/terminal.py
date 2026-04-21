@@ -51,5 +51,6 @@ class TerminalReporter:
             f"[bold red]{counts['critical']} critical[/] · "
             f"[bold orange1]{counts['high']} high[/] · "
             f"[bold yellow]{counts['medium']} medium[/] · "
-            f"[green]{counts['low']} low[/]"
+            f"[green]{counts['low']} low[/] · "
+            f"[dim]{counts['info']} info[/]"
         )

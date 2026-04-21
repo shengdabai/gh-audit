@@ -29,7 +29,8 @@ def redact_email(value: str) -> str:
     local, _, domain = value.partition("@")
     if not domain:
         return "***"
-    return local[0] + "***@" + domain
+    masked_local = (local[0] + "***") if local else "***"
+    return masked_local + "@" + domain
 
 
 def redact_id_number(value: str) -> str:

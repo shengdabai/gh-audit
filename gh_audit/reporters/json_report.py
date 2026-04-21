@@ -11,6 +11,7 @@ class JsonReporter:
             "high": sum(1 for f in findings if f.severity == Severity.HIGH),
             "medium": sum(1 for f in findings if f.severity == Severity.MEDIUM),
             "low": sum(1 for f in findings if f.severity == Severity.LOW),
+            "info": sum(1 for f in findings if f.severity == Severity.INFO),
         }
         data = {
             "repo": repo,

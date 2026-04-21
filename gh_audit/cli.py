@@ -9,7 +9,7 @@ from rich.console import Console
 from gh_audit.config import Config
 from gh_audit.discovery import cleanup_repo, clone_repo, get_repo_info, list_org_repos
 from gh_audit.models import Severity
-from gh_audit.normalizer import deduplicate
+from gh_audit.normalizer import deduplicate, diff_findings, load_previous_content_fingerprints, load_suppressions
 from gh_audit.reporters.html_report import HtmlReporter
 from gh_audit.reporters.json_report import JsonReporter
 from gh_audit.reporters.terminal import TerminalReporter
@@ -24,6 +24,8 @@ from gh_audit.scanners.secrets import SecretsScanner
 console = Console()
 
 _SEVERITY_ORDER = ["info", "low", "medium", "high", "critical"]
+
+_KNOWN_MODULES = {"secrets", "pii", "sast", "sca", "iac", "governance"}
 
 _ALL_SCANNERS = {
     "secrets": SecretsScanner,
@@ -53,6 +55,13 @@ def scan(repo, org, branch, modules, output, min_severity, diff):
     cfg = Config.load()
     output_formats = [o.strip() for o in output.split(",")]
     enabled_modules = [m.strip() for m in modules.split(",")] if modules else cfg.modules
+
+    unknown = [m for m in enabled_modules if m not in _KNOWN_MODULES]
+    if unknown:
+        raise click.BadParameter(
+            f"Unknown modules: {', '.join(unknown)}. Valid: {', '.join(sorted(_KNOWN_MODULES))}",
+            param_hint="--modules",
+        )
 
     try:
         if org:
@@ -108,7 +117,6 @@ def scan(repo, org, branch, modules, output, min_severity, diff):
         all_findings = deduplicate(all_findings)
 
         if diff:
-            from gh_audit.normalizer import diff_findings, load_previous_content_fingerprints
             prev_fps = load_previous_content_fingerprints(cfg.results_dir, repo_info.full_name)
             all_findings = diff_findings(all_findings, prev_fps)
             console.print(f"  [dim]--diff: {len(all_findings)} new findings vs last scan[/dim]")
@@ -117,7 +125,6 @@ def scan(repo, org, branch, modules, output, min_severity, diff):
                     if _SEVERITY_ORDER.index(f.severity.value) >= min_sev_idx]
 
         # Apply suppressions
-        from gh_audit.normalizer import load_suppressions
         suppressed = load_suppressions()
         filtered = [f for f in filtered
                     if f.compute_content_fingerprint() not in suppressed]
