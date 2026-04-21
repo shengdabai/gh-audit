@@ -56,13 +56,20 @@ class Finding:
     status: Status
 
     def compute_fingerprint(self) -> str:
+        """Location-aware fingerprint for within-scan deduplication."""
         raw = f"{self.category}:{self.file_path}:{self.line_start}:{self.rule_id}:{self.evidence_redacted}"
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    def compute_content_fingerprint(self) -> str:
+        """Content-only fingerprint for cross-scan diff (location-independent)."""
+        raw = f"{self.category}:{self.rule_id}:{self.evidence_redacted}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
     def to_dict(self) -> dict:
         return {
             "finding_id": self.finding_id,
             "fingerprint": self.fingerprint,
+            "content_fingerprint": self.compute_content_fingerprint(),
             "repo": self.repo,
             "branch": self.branch,
             "commit_sha": self.commit_sha,

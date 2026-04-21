@@ -11,6 +11,8 @@ _SEVERITY_STYLE = {
     "info": "dim",
 }
 
+_SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"]
+
 console = Console()
 
 
@@ -31,7 +33,7 @@ class TerminalReporter:
         table.add_column("Evidence", width=25)
         table.add_column("Recommendation", width=35)
 
-        for f in sorted(findings, key=lambda x: list(Severity).index(x.severity)):
+        for f in sorted(findings, key=lambda x: _SEVERITY_ORDER.index(x.severity.value)):
             style = _SEVERITY_STYLE.get(f.severity.value, "")
             table.add_row(
                 f"[{style}]{f.severity.value.upper()}[/{style}]",

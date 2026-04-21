@@ -1,5 +1,6 @@
 import json
 import os
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -40,6 +41,8 @@ class Config:
             "history_depth": self.history_depth,
         }
         _CONFIG_FILE.write_text(json.dumps(data, indent=2))
+        # Restrict permissions: owner read/write only
+        os.chmod(_CONFIG_FILE, stat.S_IRUSR | stat.S_IWUSR)
 
     def set(self, key: str, value: str) -> None:
         if key == "token":
