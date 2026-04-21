@@ -92,13 +92,30 @@ def scan(repo, org, branch, modules, output, min_severity, diff):
                 findings = scanner.scan(repo_path, scan_cfg)
                 all_findings.extend(findings)
                 console.print(f"  [green]✓[/green] {mod_name}: {len(findings)} findings")
+        except RuntimeError as e:
+            console.print(f"[red]✗ Skipping {repo_info.full_name}: {e}[/red]")
+            continue
         finally:
             if repo_path:
                 cleanup_repo(repo_path)
 
         all_findings = deduplicate(all_findings)
+
+        if diff:
+            from gh_audit.normalizer import diff_findings, load_previous_content_fingerprints
+            prev_fps = load_previous_content_fingerprints(cfg.results_dir, repo_info.full_name)
+            all_findings = diff_findings(all_findings, prev_fps)
+            console.print(f"  [dim]--diff: {len(all_findings)} new findings vs last scan[/dim]")
+
         filtered = [f for f in all_findings
                     if _SEVERITY_ORDER.index(f.severity.value) >= min_sev_idx]
+
+        # Apply suppressions
+        from gh_audit.normalizer import load_suppressions
+        suppressed = load_suppressions()
+        filtered = [f for f in filtered
+                    if f.compute_content_fingerprint() not in suppressed]
+
         _write_reports(filtered, repo_info.full_name, output_formats, cfg)
 
 
@@ -177,17 +194,17 @@ def history(repo):
 
 
 @cli.command()
-@click.argument("finding_id")
+@click.argument("fingerprint")
 @click.option("--reason", required=True)
-@click.option("--expires", default="30d")
-def suppress(finding_id, reason, expires):
-    """Mark a finding as suppressed (false positive)."""
+@click.option("--expires", default="30d", help="e.g. 30d, 90d")
+def suppress(fingerprint, reason, expires):
+    """Suppress a finding by its content fingerprint (shown in JSON report)."""
     suppress_file = Path.home() / ".gh-audit" / "suppressions.json"
     data = json.loads(suppress_file.read_text()) if suppress_file.exists() else {}
-    data[finding_id] = {"reason": reason, "expires": expires}
+    data[fingerprint] = {"reason": reason, "expires": expires}
     suppress_file.parent.mkdir(parents=True, exist_ok=True)
     suppress_file.write_text(json.dumps(data, indent=2))
-    console.print(f"[green]✓[/green] Finding {finding_id} suppressed ({expires}): {reason}")
+    console.print(f"[green]✓[/green] Fingerprint {fingerprint[:16]}... suppressed ({expires}): {reason}")
 
 
 @cli.group()
@@ -201,5 +218,7 @@ def config():
 def config_set(key, value):
     """Set a config value."""
     cfg = Config.load()
+    if key == "token":
+        console.print("[yellow]⚠ Storing token in config file. Prefer: export GITHUB_TOKEN=...[/yellow]")
     cfg.set(key, value)
-    console.print(f"[green]✓[/green] Set {key}={value}")
+    console.print(f"[green]✓[/green] Set {key}={'***' if key == 'token' else value}")
