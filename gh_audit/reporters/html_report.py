@@ -1,3 +1,4 @@
+from html import escape
 from datetime import datetime, timezone
 from gh_audit.models import Finding, Severity
 
@@ -17,12 +18,12 @@ class HtmlReporter:
             color = _SEVERITY_COLOR.get(f.severity.value, "#6b7280")
             rows += (
                 f"<tr>"
-                f"<td><span style='color:{color};font-weight:bold'>{f.severity.value.upper()}</span></td>"
-                f"<td>{f.category.value}</td>"
-                f"<td>{f.title}</td>"
-                f"<td><code>{f.file_path}:{f.line_start}</code></td>"
-                f"<td><code>{f.evidence_redacted}</code></td>"
-                f"<td>{f.recommendation}</td>"
+                f"<td><span style='color:{color};font-weight:bold'>{escape(f.severity.value.upper())}</span></td>"
+                f"<td>{escape(f.category.value)}</td>"
+                f"<td>{escape(f.title)}</td>"
+                f"<td><code>{escape(f.file_path)}:{f.line_start}</code></td>"
+                f"<td><code>{escape(f.evidence_redacted)}</code></td>"
+                f"<td>{escape(f.recommendation)}</td>"
                 f"</tr>"
             )
 
@@ -34,7 +35,7 @@ class HtmlReporter:
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>gh-audit: {repo}</title>
+  <title>gh-audit: {escape(repo)}</title>
   <style>
     body {{ font-family: -apple-system, sans-serif; margin: 2rem; color: #1f2937; }}
     h1 {{ color: #111827; }}
@@ -47,7 +48,7 @@ class HtmlReporter:
   </style>
 </head>
 <body>
-  <h1>gh-audit Report: {repo}</h1>
+  <h1>gh-audit Report: {escape(repo)}</h1>
   <p>Scanned at {ts}</p>
   <div class="summary">
     <span class="badge" style="background:#dc2626">{summary_counts['critical']} Critical</span>

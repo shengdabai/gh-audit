@@ -52,7 +52,15 @@ def clone_repo(repo_info: RepoInfo, token: str | None = None) -> str:
     clone_url = repo_info.clone_url
     if token:
         clone_url = clone_url.replace("https://", f"https://x-access-token:{token}@")
-    git.Repo.clone_from(clone_url, tmp_dir, depth=1)
+    try:
+        git.Repo.clone_from(clone_url, tmp_dir, depth=1)
+    except git.exc.GitCommandError as e:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        # Redact token from error message before raising
+        msg = str(e)
+        if token:
+            msg = msg.replace(token, "***")
+        raise RuntimeError(f"Clone failed for {repo_info.full_name}: {msg}") from None
     return tmp_dir
 
 

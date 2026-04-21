@@ -6,9 +6,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+from rich.console import Console
 
 from gh_audit.models import Category, Confidence, Finding, Severity, Status
 from gh_audit.scanners.base import BaseScanner, ScanConfig
+
+console = Console()
 
 
 class ScaScanner(BaseScanner):
@@ -25,14 +28,21 @@ class ScaScanner(BaseScanner):
                 ["osv-scanner", "--format=json", repo_path],
                 capture_output=True, text=True, timeout=120,
             )
+            if result.returncode not in (0, 1):
+                console.print(f"[yellow][sca] osv-scanner exited {result.returncode}: {result.stderr[:200]}[/yellow]")
+                return []
             data = json.loads(result.stdout)
-        except Exception:
+        except subprocess.TimeoutExpired:
+            console.print("[yellow][sca] osv-scanner timed out after 120s[/yellow]")
+            return []
+        except json.JSONDecodeError as e:
+            console.print(f"[yellow][sca] osv-scanner returned invalid JSON: {e}[/yellow]")
             return []
         findings = []
         for r in data.get("results", []):
             for pkg in r.get("packages", []):
+                pkg_info = pkg.get("package", {})
                 for vuln in pkg.get("vulnerabilities", []):
-                    pkg_info = pkg.get("package", {})
                     f = Finding(
                         finding_id=str(uuid.uuid4()), fingerprint="",
                         repo=config.repo, branch=config.branch, commit_sha=config.commit_sha,
@@ -60,8 +70,10 @@ class ScaScanner(BaseScanner):
             try:
                 text = lock.read_text(encoding="utf-8", errors="ignore")
                 packages = self._parse_requirements(text)
-                for pkg, version in packages[:20]:
-                    for v in self._query_osv_api(pkg, version):
+                # Batch OSV API calls
+                vulns_by_pkg = self._query_osv_api_batch(packages[:20])
+                for (pkg, version), vulns in vulns_by_pkg.items():
+                    for v in vulns:
                         f = Finding(
                             finding_id=str(uuid.uuid4()), fingerprint="",
                             repo=config.repo, branch=config.branch, commit_sha=config.commit_sha,
@@ -79,7 +91,8 @@ class ScaScanner(BaseScanner):
                         )
                         f.fingerprint = f.compute_fingerprint()
                         findings.append(f)
-            except Exception:
+            except Exception as e:
+                console.print(f"[yellow][sca] error scanning {lock}: {e}[/yellow]")
                 continue
         return findings
 
@@ -94,13 +107,26 @@ class ScaScanner(BaseScanner):
                 results.append((m.group(1), m.group(2)))
         return results
 
-    def _query_osv_api(self, package: str, version: str) -> list[dict]:
+    def _query_osv_api_batch(self, packages: list[tuple[str, str]]) -> dict[tuple[str, str], list[dict]]:
+        """Use OSV batch endpoint to query all packages in one request."""
+        if not packages:
+            return {}
+        queries = [
+            {"version": version, "package": {"name": pkg, "ecosystem": "PyPI"}}
+            for pkg, version in packages
+        ]
         try:
             resp = requests.post(
-                "https://api.osv.dev/v1/query",
-                json={"version": version, "package": {"name": package, "ecosystem": "PyPI"}},
-                timeout=5,
+                "https://api.osv.dev/v1/querybatch",
+                json={"queries": queries},
+                timeout=15,
             )
-            return resp.json().get("vulns", [])
-        except Exception:
-            return []
+            results = resp.json().get("results", [])
+        except Exception as e:
+            console.print(f"[yellow][sca] OSV API error: {e}[/yellow]")
+            return {}
+        return {
+            packages[i]: result.get("vulns", [])
+            for i, result in enumerate(results)
+            if i < len(packages)
+        }

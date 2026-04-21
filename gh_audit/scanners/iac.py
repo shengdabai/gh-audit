@@ -3,8 +3,12 @@ import subprocess
 import uuid
 from datetime import datetime, timezone
 
+from rich.console import Console
+
 from gh_audit.models import Category, Confidence, Finding, Severity, Status
 from gh_audit.scanners.base import BaseScanner, ScanConfig
+
+console = Console()
 
 
 class IacScanner(BaseScanner):
@@ -26,8 +30,15 @@ class IacScanner(BaseScanner):
                 ["trivy", "config", "--format=json", repo_path],
                 capture_output=True, text=True, timeout=120,
             )
+            if result.returncode not in (0, 1):
+                console.print(f"[yellow][iac] trivy exited {result.returncode}: {result.stderr[:200]}[/yellow]")
+                return []
             data = json.loads(result.stdout)
-        except Exception:
+        except subprocess.TimeoutExpired:
+            console.print("[yellow][iac] trivy timed out after 120s[/yellow]")
+            return []
+        except json.JSONDecodeError as e:
+            console.print(f"[yellow][iac] trivy returned invalid JSON: {e}[/yellow]")
             return []
         findings = []
         sev_map = {"CRITICAL": Severity.CRITICAL, "HIGH": Severity.HIGH,
@@ -60,8 +71,15 @@ class IacScanner(BaseScanner):
                 ["checkov", "-d", repo_path, "--output", "json"],
                 capture_output=True, text=True, timeout=120,
             )
+            if result.returncode not in (0, 1):
+                console.print(f"[yellow][iac] checkov exited {result.returncode}: {result.stderr[:200]}[/yellow]")
+                return []
             data = json.loads(result.stdout)
-        except Exception:
+        except subprocess.TimeoutExpired:
+            console.print("[yellow][iac] checkov timed out after 120s[/yellow]")
+            return []
+        except json.JSONDecodeError as e:
+            console.print(f"[yellow][iac] checkov returned invalid JSON: {e}[/yellow]")
             return []
         findings = []
         checks = data if isinstance(data, list) else [data]

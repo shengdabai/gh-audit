@@ -3,8 +3,12 @@ import subprocess
 import uuid
 from datetime import datetime, timezone
 
+from rich.console import Console
+
 from gh_audit.models import Category, Confidence, Finding, Severity, Status
 from gh_audit.scanners.base import BaseScanner, ScanConfig
+
+console = Console()
 
 
 class SastScanner(BaseScanner):
@@ -26,8 +30,15 @@ class SastScanner(BaseScanner):
                 ["semgrep", "--config=auto", "--json", repo_path],
                 capture_output=True, text=True, timeout=120,
             )
+            if result.returncode not in (0, 1):
+                console.print(f"[yellow][sast] semgrep exited {result.returncode}: {result.stderr[:200]}[/yellow]")
+                return []
             data = json.loads(result.stdout)
-        except Exception:
+        except subprocess.TimeoutExpired:
+            console.print("[yellow][sast] semgrep timed out after 120s[/yellow]")
+            return []
+        except json.JSONDecodeError as e:
+            console.print(f"[yellow][sast] semgrep returned invalid JSON: {e}[/yellow]")
             return []
         findings = []
         for r in data.get("results", []):
@@ -57,8 +68,15 @@ class SastScanner(BaseScanner):
                 ["bandit", "-r", repo_path, "-f", "json"],
                 capture_output=True, text=True, timeout=120,
             )
+            if result.returncode not in (0, 1):
+                console.print(f"[yellow][sast] bandit exited {result.returncode}: {result.stderr[:200]}[/yellow]")
+                return []
             data = json.loads(result.stdout)
-        except Exception:
+        except subprocess.TimeoutExpired:
+            console.print("[yellow][sast] bandit timed out after 120s[/yellow]")
+            return []
+        except json.JSONDecodeError as e:
+            console.print(f"[yellow][sast] bandit returned invalid JSON: {e}[/yellow]")
             return []
         findings = []
         for r in data.get("results", []):
