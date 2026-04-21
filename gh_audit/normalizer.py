@@ -62,14 +62,29 @@ def load_previous_content_fingerprints(results_dir, repo_name: str) -> set[str]:
 
 
 def load_suppressions() -> set[str]:
-    """Load suppressed content fingerprints."""
+    """Load suppressed content fingerprints, skipping expired entries."""
+    import json
+    from datetime import datetime, timezone, timedelta
     from pathlib import Path
     suppress_file = Path.home() / ".gh-audit" / "suppressions.json"
     if not suppress_file.exists():
         return set()
     try:
-        import json
         data = json.loads(suppress_file.read_text())
-        return set(data.keys())
+        now = datetime.now(timezone.utc)
+        active = set()
+        for fp, meta in data.items():
+            expires_str = meta.get("expires", "")
+            created_str = meta.get("created_at", "")
+            if expires_str and created_str:
+                try:
+                    days = int(expires_str.rstrip("d"))
+                    created = datetime.fromisoformat(created_str)
+                    if now > created + timedelta(days=days):
+                        continue  # expired, skip
+                except (ValueError, TypeError):
+                    pass  # malformed, treat as non-expiring
+            active.add(fp)
+        return active
     except Exception:
         return set()

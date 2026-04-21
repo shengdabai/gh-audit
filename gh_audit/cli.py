@@ -54,13 +54,19 @@ def scan(repo, org, branch, modules, output, min_severity, diff):
     output_formats = [o.strip() for o in output.split(",")]
     enabled_modules = [m.strip() for m in modules.split(",")] if modules else cfg.modules
 
-    if org:
-        console.print(f"[bold]Discovering repos in org:[/bold] {org}")
-        repos = list_org_repos(org, cfg.token)
-    elif repo:
-        repos = [get_repo_info(repo, cfg.token)]
-    else:
-        raise click.UsageError("Provide REPO or --org")
+    try:
+        if org:
+            console.print(f"[bold]Discovering repos in org:[/bold] {org}")
+            repos = list_org_repos(org, cfg.token)
+        elif repo:
+            repos = [get_repo_info(repo, cfg.token)]
+        else:
+            raise click.UsageError("Provide REPO or --org")
+    except click.UsageError:
+        raise
+    except Exception as e:
+        console.print(f"[red]✗ Failed to discover repos: {e}[/red]")
+        raise SystemExit(1)
 
     min_sev_idx = _SEVERITY_ORDER.index(min_severity)
 
@@ -201,7 +207,7 @@ def suppress(fingerprint, reason, expires):
     """Suppress a finding by its content fingerprint (shown in JSON report)."""
     suppress_file = Path.home() / ".gh-audit" / "suppressions.json"
     data = json.loads(suppress_file.read_text()) if suppress_file.exists() else {}
-    data[fingerprint] = {"reason": reason, "expires": expires}
+    data[fingerprint] = {"reason": reason, "expires": expires, "created_at": datetime.now(timezone.utc).isoformat()}
     suppress_file.parent.mkdir(parents=True, exist_ok=True)
     suppress_file.write_text(json.dumps(data, indent=2))
     console.print(f"[green]✓[/green] Fingerprint {fingerprint[:16]}... suppressed ({expires}): {reason}")
