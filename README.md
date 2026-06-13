@@ -4,20 +4,20 @@ One-command security audit for GitHub repos & orgs: secrets, PII, vuln deps, IaC
 
 ## Business Context
 
-- **Category:** software project
-- **Audience:** builders and operators evaluating a focused software experiment.
+- **Category:** security and governance tool
+- **Audience:** builders and operators who need safer repositories, cleaner handoffs, and repeatable security checks.
 - **Repository status:** Public repository. Keep examples, docs, and issues free of credentials, private data, and machine-specific paths.
 - **Topics:** audit, cli, devsecops, github, pii, python, secrets-detection, security, vulnerability-scanner
 
 ## What This Project Is For
 
 - One-command security audit for GitHub repos & orgs: secrets, PII, vuln deps, IaC & governance — redaction-first Python CLI.
-- Clarify the problem this project solves and who it is for.
-- Make setup, review, and iteration easier for future collaborators.
+- Find repository risks early without exposing secrets in reports.
+- Make security review repeatable across public and private codebases.
 
 ## Where It Fits
 
-This repository captures a focused experiment or tool that can be evaluated, reused, or promoted into a productized workflow when it proves useful.
+This repository belongs in the trust-and-safety layer of the workbench: it helps make code, configuration, and public handoffs safer before they are reused or shown to clients.
 
 ## Technical Overview
 
@@ -29,13 +29,13 @@ This repository captures a focused experiment or tool that can be evaluated, reu
 
 ## Repository Map
 
+- `docs`
+- `tests`
 - `LICENSE`
 - `README.md`
 - `SECURITY.md`
-- `docs`
 - `gh_audit`
 - `pyproject.toml`
-- `tests`
 
 ## Quick Start
 
@@ -49,19 +49,19 @@ python3 -m pytest
 | Command | Purpose |
 |---|---|
 | `python3 -m venv .venv && source .venv/bin/activate` | Create an isolated Python environment. |
-| `python3 -m pytest` | Run tests if the repository includes them. |
+| `python3 -m pytest` | Run the Python test suite. |
 
 ## Operating Notes
 
 - Keep real credentials out of the repository. Use local environment files, GitHub repository secrets, or the deployment platform secret manager.
 - If a `.env.example` file exists, treat it as documentation only; never commit filled-in `.env` files.
 - Before publishing screenshots, demos, or client examples, remove private names, internal paths, account IDs, and API endpoints.
-- The `Repository Hygiene` workflow is intended as a lightweight guardrail, not a replacement for product-specific tests.
+- The `Repository Hygiene` workflow is a lightweight guardrail, not a replacement for product-specific tests.
 
 ## Delivery Checklist
 
 - [ ] README describes the user, business outcome, and operating boundary.
-- [ ] Setup or preview commands are current.
+- [ ] Setup or preview commands are current and do not rely on private machine state.
 - [ ] No real secrets, private user data, or machine-local state are tracked.
 - [ ] Screenshots, demos, or sample outputs are safe to share publicly when the repository is public.
 - [ ] Product-specific tests or smoke checks are documented before production use.
